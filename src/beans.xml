@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:context="http://www.springframework.org/schema/context" xmlns:p="http://www.springframework.org/schema/p"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:util="http://www.springframework.org/schema/util"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.3.xsd
+		http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.3.xsd
+		http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.3.xsd
+		http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.3.xsd
+		http://www.springframework.org/schema/util http://www.springframework.org/schema/util/spring-util-4.3.xsd">
+	<!--1.启动Spring注解 -->
+	<context:annotation-config></context:annotation-config>
+	<!--2.扫描 -->
+	<context:component-scan base-package="com.wangweile">
+		<context:exclude-filter type="annotation" expression="org.springframework.stereotype.Controller" />
+		<context:exclude-filter type="annotation" expression="org.springframework.web.bind.annotation.ControllerAdvice" />
+	</context:component-scan>
+	<!--3.读取属性文件 -->
+	<context:property-placeholder location="classpath:jdbc.properties"/>
+	<!--4.配置数据源 -->
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" destroy-method="close">
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+		<!-- 配置初始化大小、最小、最大 -->
+		<property name="initialSize" value="3" />
+		<!-- 最大空闲时，当经过一个高峰之后，连接池可以将一些用不到的连接释放，一直减少到maxIdle为止 -->
+		<property name="minIdle" value="5" />
+		<!-- 连接池的最大值 -->
+		<property name="maxActive" value="20" />
+		<!-- 配置获取连接等待超时的时间 -->
+		<property name="maxWait" value="60000" />
+		<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+		<property name="minEvictableIdleTimeMillis" value="300000" />
+		<property name="validationQuery" value="SELECT 'x'" />
+		<property name="testWhileIdle" value="true" />
+		<property name="testOnBorrow" value="false" />
+		<property name="testOnReturn" value="false" />
+	</bean>
+	<!--5.创建SqlSessionFactory对象，需要第三方的支持 -->
+	<bean id="sqlSessionFactoryBean" class="org.mybatis.spring.SqlSessionFactoryBean">
+		<!--注入数据源 -->
+		<property name="dataSource" ref="dataSource" />
+		<!--读取MyBatis的核心配置文件 -->
+		<property name="configLocation" value="classpath:mybatis-config.xml" />
+		<!--读取映射文件 -->
+		<property name="mapperLocations"
+			value="classpath*:com/wangweile/**/model/*Mapper.xml"></property>
+	</bean>
+	<!--6.完成接口自动实例化  -->
+	<bean id="mapperScannerConfigurer" class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+		<property name="basePackage">
+		<value>com.wangweile.**.dao</value>
+		</property>
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactoryBean"/>
+	</bean>
+	<!--7.配置事物管理器  -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<property name="dataSource" ref="dataSource"/>
+	</bean>
+	<!--8.告知哪些方法需要事物管理器进行管理 -->
+	<tx:advice id="serviceAdvice" transaction-manager="transactionManager">
+		 <tx:attributes>
+            <tx:method name="get*" read-only="true" />
+            <tx:method name="load*" read-only="true" />
+            <tx:method name="query*" read-only="true" />
+            <tx:method name="list*" read-only="true" />
+            <tx:method name="select*" read-only="true" />
+            <tx:method name="find*" read-only="true" />
+            <tx:method name="count*" read-only="true" />
+            <tx:method name="check*" read-only="true" />
+            <tx:method name="valid*" read-only="true" />
+            <tx:method name="login*" read-only="true" />
+            <!-- 上述方法只是只读状态 -->
+            <tx:method name="*" propagation="REQUIRED" />
+        </tx:attributes>
+	</tx:advice>
+	<!--9.通过AOP告知控制哪个层次下的方法  -->
+	<aop:config proxy-target-class="true">
+		<aop:pointcut expression="execution(* com.wangweile..service.*Service.*(..))" id="servicePointCut" />
+        <aop:advisor advice-ref="serviceAdvice" pointcut-ref="servicePointCut" />
+	</aop:config>
+	<!--10.事物注解  -->
+	<tx:annotation-driven proxy-target-class="true" transaction-manager="transactionManager"/>
+	<!--11.启动AOP注解  -->
+	<aop:aspectj-autoproxy proxy-target-class="true"/>
+</beans>
